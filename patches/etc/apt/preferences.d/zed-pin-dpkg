@@ -1,8 +1,0 @@
-# Holds the bootstrap's dpkg, which rewrites com.termux paths while it
-# unpacks packages (TERMUX_APP__PACKAGE_NAME). Termux's own build doesn't,
-# so upgrading to it would break every later install. A pin on the exact
-# version holds it; the earlier `Pin: release *` matched the repository's
-# versions too and would have pulled in Termux's next dpkg.
-Package: dpkg
-Pin: version 1.22.6-5
-Pin-Priority: 1001

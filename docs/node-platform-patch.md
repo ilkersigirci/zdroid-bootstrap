@@ -1,6 +1,6 @@
 # Node binary `NODE_PLATFORM` patch
 
-**Status:** Active
+**Status:** Removed in v2026.05.06-r8. On a tablet, Node 25.8.2 still reported `android` after the patch, though the same binary reported `linux` in termux-docker, and npm then left out packages' linux binaries. Since v2026.05.06-r7 the npm wrapper sets `npm_config_os=linux`, npm's own setting for which platform's optional dependencies to install, and Codex's launcher and the launcher generator handle the rest. The writeup below describes the removed patch.
 **Phase / Commit:** L4 npm intercept
 **Files:** `crates/gpui_android/src/termux_bootstrap.rs` (`patch_node_platform_now`, `install_apt_node_platform_hook`)
 

@@ -56,17 +56,15 @@ case "$1" in
         # Node the bootstrap ships.
         run apt --fix-broken install
         run pkg install npm
-        run npm install -g @openai/codex
+        run npm install -g @openai/codex @anthropic-ai/claude-code
         run codex --version
+        run claude --version
         ;;
 esac
 # apt can still fetch, and what it installs runs.
 run apt update
 run apt install jq
 run jq --version
-# npm picks packages' native builds by process.platform; the node platform
-# hook makes Termux's Node report linux.
-run node -e 'process.exit(process.platform === "linux" ? 0 : 1)'
 
 {
     echo "== sh with LD_PRELOAD"

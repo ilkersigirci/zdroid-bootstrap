@@ -66,6 +66,14 @@ REMOVED=(
     # places; zed-pre-install-rewrite.sh now patches packages beforehand.
     etc/apt/apt.conf.d/98-zed-patchelf
     etc/apt/zed-patchelf-hook.sh
+    # Unneeded once the pre-install hook repacks packages as com.zdroid
+    # ones: stock dpkg installs them, and their metadata is already right.
+    etc/apt/preferences.d/zed-pin-dpkg
+    etc/apt/apt.conf.d/99-zed-rewrite-postinst
+    # Didn't change what Node reports on every device; the npm wrapper sets
+    # npm_config_os=linux instead.
+    etc/apt/apt.conf.d/97-zed-node-platform
+    etc/apt/zed-node-platform-hook.sh
 )
 for path in "${REMOVED[@]}"; do
     rm -f "$ROOTFS/$path"

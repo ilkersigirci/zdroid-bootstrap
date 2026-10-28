@@ -77,11 +77,13 @@ find "$PREFIX" -path "$PREFIX/lib/node_modules" -prune -o -type f -cnewer "$WORK
             echo "${file#"$PREFIX"/}"
         fi
     done | sort > "$WORK/leftovers"
-{ cat "$WORK/leftovers"; echo "(end)"; } | annotate "installed ELF files still naming com.termux"
+# dpkg's records of what it installed, from the packages' metadata.
+grep -l "/data/data/com.termux/" "$PREFIX"/var/lib/dpkg/info/* "$PREFIX/var/lib/dpkg/status" 2>/dev/null \
+    | sed "s|$PREFIX/||" >> "$WORK/leftovers"
+{ cat "$WORK/leftovers"; echo "(end)"; } | annotate "installed files still naming com.termux"
 grep -E "^(Commandline|Error)" "$PREFIX/var/log/apt/history.log" 2>&1 | annotate "apt history"
 
 grep -q "^apt update -> exit 0$" "$APP/results" \
     && grep -q "^jq --version -> exit 0$" "$APP/results" \
-    && grep -q "^node -e .* -> exit 0$" "$APP/results" \
-    && ! grep -q "^codex --version -> exit [1-9]" "$APP/results" \
+    && ! grep -q -- "--version -> exit [1-9]" "$APP/results" \
     && [ ! -s "$WORK/leftovers" ]

@@ -1,9 +1,12 @@
 #!/data/data/com.zdroid/files/usr/bin/sh
 # apt's DPkg::Pre-Install-Pkgs runs this with the .deb paths on stdin before
 # dpkg unpacks them. Termux's repository builds every package for
-# com.termux, so each one is rewritten for com.zdroid first, in every file,
-# maintainer scripts and ELF binaries alike:
-#   - /data/data/com.termux/ -> /data/data/com.zdroid/, which also fixes
+# com.termux; each one is repacked as a com.zdroid package, so plain dpkg
+# installs it where Zdroid's userland lives:
+#   - data/data/com.termux/ becomes data/data/com.zdroid/, and symlinks
+#     pointing into it are re-pointed.
+#   - in every file, ELF binaries and DEBIAN/ metadata included,
+#     /data/data/com.termux/ -> /data/data/com.zdroid/, which also fixes
 #     DT_RUNPATH. Both are 22 bytes, so no offset in an ELF file moves.
 #   - a standalone "/etc/resolv.conf" -> "/sdcard/.zed/r", which
 #     gpui_android::dns_bridge fills with Android's DNS servers. Only with
@@ -23,11 +26,18 @@ while IFS= read -r deb; do
     case "$deb" in *.deb) ;; *) continue ;; esac
     [ -f "$deb" ] || continue
     tmp=$(mktemp -d 2>/dev/null) || continue
-    if dpkg-deb -R "$deb" "$tmp" 2>/dev/null; then
-        files=$(grep -rl -a -e '/data/data/com.termux/' -e '/etc/resolv.conf' "$tmp" 2>/dev/null)
-        if [ -n "$files" ]; then
-            printf '%s\n' "$files" | "$PREFIX/bin/perl" -e '
-                my $changed = 0;
+    if dpkg-deb -R "$deb" "$tmp" 2>/dev/null && [ -d "$tmp/data/data/com.termux" ]; then
+        mv "$tmp/data/data/com.termux" "$tmp/data/data/com.zdroid"
+        find "$tmp/data" -type l | while IFS= read -r link; do
+            target=$(readlink "$link")
+            case "$target" in
+                /data/data/com.termux/*)
+                    ln -sfn "/data/data/com.zdroid/${target#/data/data/com.termux/}" "$link"
+                    ;;
+            esac
+        done
+        grep -rl -a -e '/data/data/com.termux/' -e '/etc/resolv.conf' "$tmp" 2>/dev/null \
+            | "$PREFIX/bin/perl" -e '
                 while (my $path = <STDIN>) {
                     chomp $path;
                     # A package can ship files read-only.
@@ -40,30 +50,22 @@ while IFS= read -r deb; do
                         if ($count) {
                             seek $fh, 0, 0;
                             print $fh $data;
-                            $changed = 1;
                         }
                         close $fh;
                     }
                     chmod($mode, $path);
                 }
-                exit($changed ? 0 : 1);
             '
-            if [ $? -eq 0 ]; then
-                # dpkg-deb -R extracts maintainer scripts at 0644; -b refuses
-                # to rebuild unless they're 0555..0775.
-                for s in preinst postinst prerm postrm; do
-                    [ -f "$tmp/DEBIAN/$s" ] && chmod 0755 "$tmp/DEBIAN/$s" 2>/dev/null
-                done
-                # --nocheck: Termux builds packages with its own tooling, and
-                # some list conffiles they don't ship (tor), which dpkg-deb -b
-                # rejects. dpkg's own path rewrite turns the com.termux paths
-                # into com.zdroid while it unpacks, matching the rewritten
-                # DEBIAN/conffiles. Uncompressed: the package only goes to
-                # dpkg, right after.
-                dpkg-deb --nocheck -Znone -b "$tmp" "$deb" >/dev/null 2>&1 \
-                    || echo "zed-pre-install-rewrite: couldn't repack $deb; it installs with com.termux paths" >&2
-            fi
-        fi
+        # dpkg-deb -R extracts maintainer scripts at 0644; -b refuses to
+        # rebuild unless they're 0555..0775.
+        for s in preinst postinst prerm postrm; do
+            [ -f "$tmp/DEBIAN/$s" ] && chmod 0755 "$tmp/DEBIAN/$s" 2>/dev/null
+        done
+        # --nocheck: Termux builds packages with its own tooling, and some
+        # list conffiles they don't ship (tor), which dpkg-deb -b rejects.
+        # Uncompressed: the package only goes to dpkg, right after.
+        dpkg-deb --nocheck -Znone -b "$tmp" "$deb" >/dev/null 2>&1 \
+            || echo "zed-pre-install-rewrite: couldn't repack $deb; it installs with com.termux paths" >&2
     fi
     rm -rf "$tmp"
 done

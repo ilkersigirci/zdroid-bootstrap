@@ -6,23 +6,22 @@ This is a fork of Dylan Murzello's [`Dylanmurzello/zdroid-bootstrap`](https://gi
 
 The bootstrap is the rebuilt Termux userland with Zdroid-specific patches baked in:
 - `applicationId=com.zdroid` (instead of `com.termux`) — every binary's `DT_RUNPATH` and shebang resolves to our app's data dir
-- Patched dpkg / apt for cross-package-name `pkg install`
 - Permission fixes for app-private storage exec
 - libtermux-exec built with our paths
-- apt Pre/Post-Invoke hooks + dpkg pin + node platform hook (Phase 8b — see `patches/`)
+- an apt pre-install hook that repacks Termux's packages as com.zdroid ones (see `patches/`)
 - musl loader with `/etc/resolv.conf` → `/sdcard/.zed/r` baked in
 - npm wrapper + launcher-generator under `.zed/bin/`
 - bash-`-l` self-bootstrap shim under `etc/profile.d/`
 
 ## Distribution
 
-Releases ship `bootstrap-aarch64.zip` (~241 MB) as a release asset. Zdroid installs it when the user taps **Install** on the Bootstrap card of the runtime picker. Each Zdroid version pins one release of this repository, by tag and SHA-256, so a new release reaches users with the next Zdroid release. The picker can also download the latest release of another repository that publishes `bootstrap-aarch64.zip`.
+Releases ship `bootstrap-aarch64.zip` (~241 MB) as a release asset. Zdroid installs the latest release when the user taps **Install** or **Reinstall** on the Bootstrap card of the runtime picker, checked against the SHA-256 GitHub records for it, so a release reaches new installs as soon as it's published. The picker's **Download from** field can name another repository that publishes `bootstrap-aarch64.zip`.
 
 Tag naming: `v<termux-bootstrap-version>-r<revision>` (e.g. `v2026.05.06-r5`). The editor stores the tag in `$PREFIX/.bootstrap-version`.
 
 ## Building
 
-Pushing an annotated `v*` tag runs `.github/workflows/release.yml`, which builds the zip and publishes it as the tag's release, with the tag's message as the release notes:
+Pushing an annotated `v*` tag runs `.github/workflows/release.yml`, which runs the tests in `.github/workflows/test.yml` and, if they pass, builds the zip and publishes it as the tag's release, with the tag's message as the release notes:
 
 ```sh
 git tag -a v2026.05.06-r6 -m "What changed, for users"
@@ -51,11 +50,8 @@ What `build.sh` does:
 | Path | Source | Purpose |
 |---|---|---|
 | `etc/profile.d/zed-init.sh` | install_profile_d_init | `bash -l` self-bootstrap (PREFIX/PATH/HOME) for sideband shells (run-as, adb, ssh subprocess) |
-| `etc/apt/preferences.d/zed-pin-dpkg` | install_apt_dpkg_pin | Holds `dpkg` at the bootstrap's version, whose path rewrite Termux's build lacks |
-| `etc/apt/apt.conf.d/99-zed-rewrite-postinst` | install_apt_rewrite_hook | DPkg::Post-Invoke sed over every metadata file type rewriting com.termux→com.zdroid |
-| `etc/apt/apt.conf.d/97-zed-pre-install` + `etc/apt/zed-pre-install-rewrite.sh` | install_apt_pre_install_hook | Before dpkg unpacks each .deb, rewrites com.termux→com.zdroid in every file, ELF files and their DT_RUNPATH included, plus the standalone `/etc/resolv.conf`, and repacks it |
-| `etc/apt/apt.conf.d/97-zed-node-platform` + `etc/apt/zed-node-platform-hook.sh` | install_apt_node_platform_hook | perl rewrites `\x00android\x00` → `\x00linux\x00\x00` in `$PREFIX/bin/node` so `process.platform === 'linux'` |
-| `.zed/bin/npm` | install_npm_wrapper | PATH-precedence wrapper setting LD_PRELOAD=libtermux-exec.so + npm_config_libc=musl, post-invokes launcher generator |
+| `etc/apt/apt.conf.d/97-zed-pre-install` + `etc/apt/zed-pre-install-rewrite.sh` | install_apt_pre_install_hook | Before dpkg unpacks each .deb, repacks it as a com.zdroid package: renames its data/data/com.termux tree, re-points symlinks, and rewrites com.termux→com.zdroid in every file, ELF files and their DT_RUNPATH included, plus the standalone `/etc/resolv.conf` |
+| `.zed/bin/npm` | install_npm_wrapper | PATH-precedence wrapper setting LD_PRELOAD=libtermux-exec.so, npm_config_libc=musl and npm_config_os=linux, post-invokes launcher generator |
 | `etc/apt/zed-launcher-gen.sh` | install_npm_launcher_generator | Walks `$PREFIX/bin/*` and `$PREFIX/lib/node_modules/**`, classifies ld-musl vs ld-linux, generates musl-static + grun wrappers |
 | `lib/ld-musl-aarch64.so.1` | install_musl_linker | Alpine's musl loader with the `/etc/resolv.conf` → `/sdcard/.zed/r` resolv.conf path hex-patched in (Bun-compiled CLIs route DNS through our materialized resolv file) |
 

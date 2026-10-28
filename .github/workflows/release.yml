@@ -1,8 +1,10 @@
 name: Release
 
-# Pushing an annotated `v*` tag builds bootstrap-aarch64.zip from the pinned
-# base and this repository's patches/, and publishes it as that tag's
-# release, with the tag's message as the release notes.
+# Pushing an annotated `v*` tag runs the tests, then builds
+# bootstrap-aarch64.zip from the pinned base and this repository's patches/
+# and publishes it as that tag's release, with the tag's message as the
+# release notes. Zdroid installs the latest release, so only a tested one
+# may become it.
 on:
   push:
     tags:
@@ -11,7 +13,13 @@ on:
 permissions: {}
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
+
   release:
+    needs: test
     runs-on: ubuntu-24.04
     permissions:
       contents: write
