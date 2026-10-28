@@ -30,7 +30,7 @@ while IFS= read -r deb; do
                 my $changed = 0;
                 while (my $path = <STDIN>) {
                     chomp $path;
-                    # Packages ship some files read-only, the tor binaries for one.
+                    # A package can ship files read-only.
                     my $mode = (stat $path)[2] & 07777;
                     chmod($mode | 0200, $path);
                     if (open my $fh, "+<:raw", $path) {
@@ -54,8 +54,14 @@ while IFS= read -r deb; do
                 for s in preinst postinst prerm postrm; do
                     [ -f "$tmp/DEBIAN/$s" ] && chmod 0755 "$tmp/DEBIAN/$s" 2>/dev/null
                 done
-                # Uncompressed: the package only goes to dpkg, right after.
-                dpkg-deb -Znone -b "$tmp" "$deb" >/dev/null 2>&1 || true
+                # --nocheck: Termux builds packages with its own tooling, and
+                # some list conffiles they don't ship (tor), which dpkg-deb -b
+                # rejects. dpkg's own path rewrite turns the com.termux paths
+                # into com.zdroid while it unpacks, matching the rewritten
+                # DEBIAN/conffiles. Uncompressed: the package only goes to
+                # dpkg, right after.
+                dpkg-deb --nocheck -Znone -b "$tmp" "$deb" >/dev/null 2>&1 \
+                    || echo "zed-pre-install-rewrite: couldn't repack $deb; it installs with com.termux paths" >&2
             fi
         fi
     fi
