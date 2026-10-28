@@ -1,0 +1,42 @@
+name: Test
+
+# Builds the zip as the release workflow does and runs apt in it on a fresh
+# install, in Termux's Docker image, which runs Termux's binaries with
+# Android's linker.
+on:
+  push:
+    branches:
+      - "**"
+
+permissions: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [issue-1, readme]
+    env:
+      BASE_URL: https://github.com/Dylanmurzello/zdroid-bootstrap/releases/download/v2026.05.06-r4/bootstrap-aarch64.zip
+      BASE_SHA256: dc6d53260b1a4ff6bbca7ab36bee37a32ff40d619981cf6ec418544d757912b7
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the base
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/base.zip" "$BASE_URL"
+          echo "$BASE_SHA256  $RUNNER_TEMP/base.zip" | sha256sum --check
+
+      - name: Build
+        run: ./build.sh "$RUNNER_TEMP/base.zip" "$RUNNER_TEMP/bootstrap-aarch64.zip"
+
+      - name: Run ${{ matrix.scenario }}
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+        run: sudo test/run.sh "$RUNNER_TEMP/bootstrap-aarch64.zip" "$SCENARIO"
