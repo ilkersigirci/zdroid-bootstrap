@@ -1,6 +1,8 @@
 # zdroid-bootstrap
 
-Termux-flavored userland tarball that the [Zdroid Android port of Zed](https://github.com/Dylanmurzello/zed-android-port) extracts into `$PREFIX` for the **Bootstrap** runtime adapter.
+Termux-flavored userland tarball that the [Zdroid Android port of Zed](https://github.com/ilkersigirci/zed-android-port) extracts into `$PREFIX` for the **Bootstrap** runtime adapter.
+
+This is a fork of Dylan Murzello's [`Dylanmurzello/zdroid-bootstrap`](https://github.com/Dylanmurzello/zdroid-bootstrap), which stopped receiving updates after `v2026.05.06-r4`. It keeps that release's userland and publishes new releases with changes to `patches/`.
 
 The bootstrap is the rebuilt Termux userland with Zdroid-specific patches baked in:
 - `applicationId=com.zdroid` (instead of `com.termux`) — every binary's `DT_RUNPATH` and shebang resolves to our app's data dir
@@ -14,20 +16,27 @@ The bootstrap is the rebuilt Termux userland with Zdroid-specific patches baked 
 
 ## Distribution
 
-Releases ship `bootstrap-aarch64.zip` (~241 MB) as a release asset. `BootstrapAdapter::install` in the editor (`crates/zdroid_runtime/src/adapters/bootstrap_install.rs`) hits this repo's `releases/latest` endpoint to pick up the tarball when the user picks Bootstrap in the runtime picker.
+Releases ship `bootstrap-aarch64.zip` (~241 MB) as a release asset. Zdroid installs it when the user taps **Install** on the Bootstrap card of the runtime picker. Each Zdroid version pins one release of this repository, by tag and SHA-256, so a new release reaches users with the next Zdroid release. The picker can also download the latest release of another repository that publishes `bootstrap-aarch64.zip`.
 
-Tag naming: `v<termux-bootstrap-version>` (e.g. `v2026.05.06-r3`). The editor stores whatever `tag_name` GitHub returns in `$PREFIX/.bootstrap-version` as the upgrade sentinel.
+Tag naming: `v<termux-bootstrap-version>-r<revision>` (e.g. `v2026.05.06-r5`). The editor stores the tag in `$PREFIX/.bootstrap-version`.
 
 ## Building
 
-Two source inputs:
-1. A vanilla `bootstrap-aarch64.zip` produced by the [termux-packages](https://github.com/termux/termux-packages) bootstrap-build with `TERMUX_APP_PACKAGE=com.zdroid`. Built on a Linux runner.
-2. The `patches/` directory in this repo — every static file the editor's `apply_runtime_patches` used to drop at first boot. Pure shell / config / one binary blob (musl loader).
-
-Then:
+Pushing an annotated `v*` tag runs `.github/workflows/release.yml`, which builds the zip and publishes it as the tag's release, with the tag's message as the release notes:
 
 ```sh
-./build.sh <input vanilla zip> <output zdroid zip>
+git tag -a v2026.05.06-r6 -m "What changed, for users"
+git push origin v2026.05.06-r6
+```
+
+Two source inputs:
+1. A base `bootstrap-aarch64.zip`. Dylan built the first one from [termux-packages](https://github.com/termux/termux-packages) with `TERMUX_APP_PACKAGE=com.zdroid` and a patched dpkg, but neither that build nor the zip is published. The workflow starts from his last release, `v2026.05.06-r4`, pinned by SHA-256: `build.sh` only overlays files and rewrites paths, so running it again on its own output is harmless. One limit follows: deleting a file from `patches/` doesn't remove it from the zip.
+2. The `patches/` directory in this repo — every static file the editor's `apply_runtime_patches` used to drop at first boot. Pure shell / config / one binary blob (musl loader).
+
+To build locally:
+
+```sh
+./build.sh <input zip> <output zip>
 ```
 
 What `build.sh` does:
