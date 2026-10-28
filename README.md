@@ -1,62 +1,61 @@
 # zdroid-bootstrap
 
-Termux-flavored userland tarball that the [Zdroid Android port of Zed](https://github.com/ilkersigirci/zed-android-port) extracts into `$PREFIX` for the **Bootstrap** runtime adapter.
+The Termux userland that [Zdroid](https://github.com/ilkersigirci/zed-android-port), the Android port of Zed, installs into `/data/data/com.zdroid/files/usr` (`$PREFIX`) for its **Bootstrap** runtime: the shell, the terminal's tools, language servers and package manager, running without root.
 
-This is a fork of Dylan Murzello's [`Dylanmurzello/zdroid-bootstrap`](https://github.com/Dylanmurzello/zdroid-bootstrap), which stopped receiving updates after `v2026.05.06-r4`. It keeps that release's userland and publishes new releases with changes to `patches/`.
+This is a fork of Dylan Murzello's [`Dylanmurzello/zdroid-bootstrap`](https://github.com/Dylanmurzello/zdroid-bootstrap), which stopped receiving updates after `v2026.05.06-r4`. It keeps that release's userland and changes the files in `patches/`.
 
-The bootstrap is the rebuilt Termux userland with Zdroid-specific patches baked in:
-- `applicationId=com.zdroid` (instead of `com.termux`) — every binary's `DT_RUNPATH` and shebang resolves to our app's data dir
-- Permission fixes for app-private storage exec
-- libtermux-exec built with our paths
-- an apt pre-install hook that repacks Termux's packages as com.zdroid ones (see `patches/`)
-- musl loader with `/etc/resolv.conf` → `/sdcard/.zed/r` baked in
-- npm wrapper + launcher-generator under `.zed/bin/`
-- bash-`-l` self-bootstrap shim under `etc/profile.d/`
+## What's in it
 
-## Distribution
+**The base userland.** Termux's bootstrap, which Dylan built from [termux-packages](https://github.com/termux/termux-packages) with `TERMUX_APP_PACKAGE=com.zdroid`, so its programs look for files under `/data/data/com.zdroid`. It includes bash, coreutils, apt and dpkg, git, OpenSSH, curl, Perl, Python, Node.js, Go, rust-analyzer and patchelf. Neither that build nor its input is published, so every release starts from his `v2026.05.06-r4`. Its dpkg is his build with a `com.termux` path rewrite (the patches are in `base/dpkg/`), which nothing uses since `v2026.05.06-r8`; a `pkg upgrade` that brings a newer dpkg replaces it with Termux's.
 
-Releases ship `bootstrap-aarch64.zip` (~241 MB) as a release asset. Zdroid installs the latest release when the user taps **Install** or **Reinstall** on the Bootstrap card of the runtime picker, checked against the SHA-256 GitHub records for it, so a release reaches new installs as soon as it's published. The picker's **Download from** field can name another repository that publishes `bootstrap-aarch64.zip`.
+**`patches/`**, copied over the base:
 
-Tag naming: `v<termux-bootstrap-version>-r<revision>` (e.g. `v2026.05.06-r5`). The editor stores the tag in `$PREFIX/.bootstrap-version`.
+| Path | Purpose |
+|---|---|
+| `etc/apt/apt.conf.d/97-zed-pre-install`, `etc/apt/zed-pre-install-rewrite.sh` | Make packages from Termux's repository install under `com.zdroid` (below) |
+| `.zed/bin/npm` | npm wrapper, first on Zdroid's `PATH`: sets npm's platform settings and runs the launcher generator afterwards (below) |
+| `etc/apt/zed-launcher-gen.sh` | Makes the Linux binaries npm packages ship run here (below) |
+| `lib/ld-musl-aarch64.so.1` | Alpine's musl 1.2.5 loader, for those binaries, with `/etc/resolv.conf` rewritten to `/sdcard/.zed/r` (below) |
+| `etc/profile.d/zed-init.sh` | Sets `PREFIX`, `PATH`, `HOME` and the rest for login shells Zdroid didn't start, such as an SSH session into Zdroid |
+| `etc/apt/sources.list` | Termux's own repository as the starting mirror |
 
-## Building
+## Packages from Termux's repository
 
-Pushing an annotated `v*` tag runs `.github/workflows/release.yml`, which runs the tests in `.github/workflows/test.yml` and, if they pass, builds the zip and publishes it as the tag's release, with the tag's message as the release notes:
+Termux builds every package for `/data/data/com.termux`. Before dpkg unpacks a package, apt runs `zed-pre-install-rewrite.sh`, which repacks it as a `com.zdroid` package:
+
+- its `data/data/com.termux` tree becomes `data/data/com.zdroid`, and symlinks pointing into it follow;
+- `/data/data/com.termux/` becomes `/data/data/com.zdroid/` in every file, scripts, metadata and binaries alike, which also fixes the library path (`DT_RUNPATH`) of ELF files. Both names are 22 bytes, so no offset inside a binary moves; that's why the app is called `com.zdroid`;
+- a standalone `/etc/resolv.conf` in a file becomes `/sdcard/.zed/r` (see DNS below).
+
+Plain dpkg then installs it, and nothing from a package ever runs with `com.termux` paths. Two limits:
+
+- `dpkg -i file.deb` skips apt's hooks; install local packages with `apt install ./file.deb`.
+- Repacked packages stay uncompressed in apt's cache until dpkg has installed them, so a large transaction, such as the clang toolchain, briefly needs about its unpacked size.
+
+## npm packages' Linux binaries
+
+Packages such as Claude Code and Codex ship native Linux binaries as optional dependencies, built for musl or glibc, not for Android's bionic.
+
+- **The npm wrapper** sets `npm_config_os=linux` and `npm_config_libc=musl`, so npm installs the musl Linux builds: npm compares a package's `os` with Node's `process.platform`, which is `android` here, and can't identify bionic. It also preloads `libtermux-exec.so` for npm's processes, which rewrites `#!/usr/bin/env` shebangs, as Android has no `/usr/bin/env`.
+- **The launcher generator** runs after every npm command, over `$PREFIX/lib/node_modules`. A musl-dynamic binary gets the bundled loader as its interpreter, the DNS rewrite, and a `$PREFIX/bin` wrapper that drops `LD_PRELOAD`, since musl can't load the bionic `libtermux-exec.so`. A glibc-dynamic one gets a wrapper through glibc-runner (`grun`), or one saying how to install it. Static binaries, such as Codex's, only need the DNS rewrite.
+
+## DNS
+
+Android has no `/etc/resolv.conf`; its resolver goes through the system's DNS service. Programs with their own resolver, such as musl's or a statically linked one, read `/etc/resolv.conf` and fail. Zdroid writes Android's current DNS servers to `/sdcard/.zed/r` at startup (`gpui_android::dns_bridge`), and the rewrites above point those programs at it. Termux's own builds read `$PREFIX/etc/resolv.conf` or use the system resolver, and are left alone.
+
+## Releases
+
+Each release publishes `bootstrap-aarch64.zip` (~241 MB). Zdroid's runtime picker installs the latest release of the repository in its **Download from** field, this one by default, when the user taps **Install** or **Reinstall**, and checks it against the SHA-256 GitHub records for it. A release reaches new installs and reinstalls as soon as it's published; installed userlands keep theirs. Tags look like `v2026.05.06-r8`: the Termux bootstrap version, then a revision.
+
+To release, push an annotated tag. `.github/workflows/release.yml` runs the tests, and only if they pass builds the zip and publishes it, with the tag's message as the release notes:
 
 ```sh
-git tag -a v2026.05.06-r6 -m "What changed, for users"
-git push origin v2026.05.06-r6
+git tag -a v2026.05.06-r9 -m "What changed, for users"
+git push origin v2026.05.06-r9
 ```
 
-Two source inputs:
-1. A base `bootstrap-aarch64.zip`. Dylan built the first one from [termux-packages](https://github.com/termux/termux-packages) with `TERMUX_APP_PACKAGE=com.zdroid` and a patched dpkg, but neither that build nor the zip is published. The workflow starts from his last release, `v2026.05.06-r4`, pinned by SHA-256: `build.sh` only overlays files and rewrites paths, so running it again on its own output is harmless. To drop a file earlier releases shipped, add it to `REMOVED` in `build.sh`.
-2. The `patches/` directory in this repo — every static file the editor's `apply_runtime_patches` used to drop at first boot. Pure shell / config / one binary blob (musl loader).
+## Building and testing
 
-To build locally:
+`build.sh <input zip> <output zip>` unzips the base, copies `patches/` over it, deletes the files listed in its `REMOVED` (files earlier releases shipped; the base is one of them) and zips the result. The workflows download the base from Dylan's release, pinned by SHA-256.
 
-```sh
-./build.sh <input zip> <output zip>
-```
-
-What `build.sh` does:
-- Unzips the input.
-- Copies `patches/` over the rootfs (preserving 0755 / 0644 modes baked in).
-- Runs `perl -i -pe` rewrites of `/data/data/com.termux/` → `/data/data/com.zdroid/` over every dpkg metadata file type (preinst/postinst/prerm/postrm + conffiles + md5sums + list + triggers + templates) and the master status DB. Catches the maintainer-script content gap that the termux-packages CI sed misses for libcompiler-rt + termux-tools.
-- Appends a `SYMLINKS.txt` entry for `libc.musl-aarch64.so.1` → `ld-musl-aarch64.so.1` so the editor's extractor replays the alias at unpack time.
-- Re-zips.
-
-## Patches directory
-
-| Path | Source | Purpose |
-|---|---|---|
-| `etc/profile.d/zed-init.sh` | install_profile_d_init | `bash -l` self-bootstrap (PREFIX/PATH/HOME) for sideband shells (run-as, adb, ssh subprocess) |
-| `etc/apt/apt.conf.d/97-zed-pre-install` + `etc/apt/zed-pre-install-rewrite.sh` | install_apt_pre_install_hook | Before dpkg unpacks each .deb, repacks it as a com.zdroid package: renames its data/data/com.termux tree, re-points symlinks, and rewrites com.termux→com.zdroid in every file, ELF files and their DT_RUNPATH included, plus the standalone `/etc/resolv.conf` |
-| `.zed/bin/npm` | install_npm_wrapper | PATH-precedence wrapper setting LD_PRELOAD=libtermux-exec.so, npm_config_libc=musl and npm_config_os=linux, post-invokes launcher generator |
-| `etc/apt/zed-launcher-gen.sh` | install_npm_launcher_generator | Walks `$PREFIX/bin/*` and `$PREFIX/lib/node_modules/**`, classifies ld-musl vs ld-linux, generates musl-static + grun wrappers |
-| `lib/ld-musl-aarch64.so.1` | install_musl_linker | Alpine's musl loader with the `/etc/resolv.conf` → `/sdcard/.zed/r` resolv.conf path hex-patched in (Bun-compiled CLIs route DNS through our materialized resolv file) |
-
-See `docs-extraction-notes.md` for the original Rust source-line mapping per file.
-
-## History
-
-Pre-Phase-6 of the Termux-divestment refactor, the zip lived under [Dylanmurzello/zed-android-port releases](https://github.com/Dylanmurzello/zed-android-port/releases) (`bootstrap-2026.05.06-r2` and earlier). Phase 6 moved distribution here. Phase 8a deleted the editor-side APK-asset extraction path. Phase 8b moved the runtime patches into `patches/` here so the zip ships pre-patched; the editor's `apply_runtime_patches` Rust path is then redundant.
+`.github/workflows/test.yml` runs on every push. On a GitHub arm64 runner, it installs the zip the way Zdroid does into [Termux's Docker image](https://github.com/termux/termux-docker), which runs Termux's binaries with Android's linker. It then runs three orders of package operations: the one from [zdroid-bootstrap#1](https://github.com/Dylanmurzello/zdroid-bootstrap/issues/1), the one from Zdroid's README with a full `pkg upgrade`, and an `npm install -g` of Codex and Claude Code. Each must leave apt able to update and to install a package that runs, the CLIs runnable, and no installed binary or dpkg record naming `com.termux`. The results appear as annotations on the run.

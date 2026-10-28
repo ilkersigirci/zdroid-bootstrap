@@ -24,11 +24,9 @@ jobs:
     permissions:
       contents: write
     env:
-      # Dylanmurzello/zdroid-bootstrap's v2026.05.06-r4. The zip build.sh was
-      # first run on, and the termux-packages build behind it, aren't
-      # published, so the last release stands in for it: build.sh only
-      # overlays patches/ and rewrites paths, so running it again on its own
-      # output is harmless. If that release disappears, use one of ours.
+      # The base: Dylanmurzello/zdroid-bootstrap's v2026.05.06-r4, the
+      # earliest release whose userland can be downloaded. If it disappears,
+      # use one of ours: build.sh only overlays patches/ and removes files.
       BASE_URL: https://github.com/Dylanmurzello/zdroid-bootstrap/releases/download/v2026.05.06-r4/bootstrap-aarch64.zip
       BASE_SHA256: dc6d53260b1a4ff6bbca7ab36bee37a32ff40d619981cf6ec418544d757912b7
     steps:

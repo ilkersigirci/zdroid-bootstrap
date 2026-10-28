@@ -20,6 +20,10 @@
 set -u
 PREFIX=/data/data/com.zdroid/files/usr
 export PATH="$PREFIX/bin:$PATH"
+# The bootstrap's dpkg-deb, a build with a com.termux path rewrite, renames
+# paths while it extracts when this is set, which Zdroid did before 0.9.19.
+# Unset, it unpacks packages as published, like Termux's own dpkg-deb.
+unset TERMUX_APP__PACKAGE_NAME
 [ -x "$PREFIX/bin/dpkg-deb" ] || exit 0
 [ -x "$PREFIX/bin/perl" ] || exit 0
 while IFS= read -r deb; do
@@ -27,9 +31,7 @@ while IFS= read -r deb; do
     [ -f "$deb" ] || continue
     tmp=$(mktemp -d 2>/dev/null) || continue
     if dpkg-deb -R "$deb" "$tmp" 2>/dev/null; then
-        # The bootstrap's own dpkg-deb renames com.termux paths as it
-        # extracts (TERMUX_APP__PACKAGE_NAME); Termux's, which a pkg upgrade
-        # can install, doesn't.
+        # Packages without files have no data directory.
         if [ -d "$tmp/data/data/com.termux" ]; then
             mv "$tmp/data/data/com.termux" "$tmp/data/data/com.zdroid"
         fi

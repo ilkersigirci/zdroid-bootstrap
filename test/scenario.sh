@@ -6,7 +6,6 @@ export HOME="$APP/files/home"
 export TERMUX__ROOTFS="$APP/files"
 export TERMUX__PREFIX="$PREFIX"
 export TERMUX__HOME="$HOME"
-export TERMUX_APP__PACKAGE_NAME=com.zdroid
 export TMPDIR="$PREFIX/tmp"
 export PATH="$PREFIX/.zed/bin:$PREFIX/bin:/system/bin"
 export LD_PRELOAD="$PREFIX/lib/libtermux-exec.so"
@@ -49,15 +48,6 @@ case "$1" in
         run pkg update
         run pkg upgrade
         run apt --fix-broken install
-        run pkg upgrade
-        ;;
-    stock-dpkg)
-        # Without this variable the bootstrap's patched dpkg rewrites no
-        # paths, like Termux's own dpkg, which a pkg upgrade can install:
-        # the pre-install hook's repacked packages must install without it.
-        unset TERMUX_APP__PACKAGE_NAME
-        run apt --fix-broken install
-        run pkg update
         run pkg upgrade
         ;;
     agents)
