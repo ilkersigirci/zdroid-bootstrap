@@ -26,9 +26,14 @@ while IFS= read -r deb; do
     case "$deb" in *.deb) ;; *) continue ;; esac
     [ -f "$deb" ] || continue
     tmp=$(mktemp -d 2>/dev/null) || continue
-    if dpkg-deb -R "$deb" "$tmp" 2>/dev/null && [ -d "$tmp/data/data/com.termux" ]; then
-        mv "$tmp/data/data/com.termux" "$tmp/data/data/com.zdroid"
-        find "$tmp/data" -type l | while IFS= read -r link; do
+    if dpkg-deb -R "$deb" "$tmp" 2>/dev/null; then
+        # The bootstrap's own dpkg-deb renames com.termux paths as it
+        # extracts (TERMUX_APP__PACKAGE_NAME); Termux's, which a pkg upgrade
+        # can install, doesn't.
+        if [ -d "$tmp/data/data/com.termux" ]; then
+            mv "$tmp/data/data/com.termux" "$tmp/data/data/com.zdroid"
+        fi
+        find "$tmp" -type l | while IFS= read -r link; do
             target=$(readlink "$link")
             case "$target" in
                 /data/data/com.termux/*)

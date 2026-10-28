@@ -51,6 +51,15 @@ case "$1" in
         run apt --fix-broken install
         run pkg upgrade
         ;;
+    stock-dpkg)
+        # Without this variable the bootstrap's patched dpkg rewrites no
+        # paths, like Termux's own dpkg, which a pkg upgrade can install:
+        # the pre-install hook's repacked packages must install without it.
+        unset TERMUX_APP__PACKAGE_NAME
+        run apt --fix-broken install
+        run pkg update
+        run pkg upgrade
+        ;;
     agents)
         # What the agent panel's CLIs need, as Zdroid's README says, on the
         # Node the bootstrap ships.

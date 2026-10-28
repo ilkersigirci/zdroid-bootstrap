@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [issue-1, readme, agents]
+        scenario: [issue-1, readme, stock-dpkg, agents]
     env:
       BASE_URL: https://github.com/Dylanmurzello/zdroid-bootstrap/releases/download/v2026.05.06-r4/bootstrap-aarch64.zip
       BASE_SHA256: dc6d53260b1a4ff6bbca7ab36bee37a32ff40d619981cf6ec418544d757912b7
