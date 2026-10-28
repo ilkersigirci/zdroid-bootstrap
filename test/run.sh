@@ -46,6 +46,9 @@ annotate() {
     echo "::warning title=$SCENARIO: $1::$(tail -n 40 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"
 }
 annotate "steps" < "$APP/results"
+for log in "$APP"/logs/*; do
+    annotate "output of step $(basename "$log")" < "$log"
+done
 {
     ls -la "$PREFIX/lib/apt/methods/"
     readelf -d "$PREFIX/lib/apt/methods/http" | grep -E "RUNPATH|NEEDED"

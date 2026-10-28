@@ -23,10 +23,13 @@ APT::Get::Assume-Yes "true";
 Dpkg::Options { "--force-confdef"; "--force-confold"; };
 EOF
 
+mkdir -p "$APP/logs"
+step=0
 run() {
+    step=$((step + 1))
     echo "::group::$*"
-    "$@" < /dev/null
-    local status=$?
+    "$@" < /dev/null 2>&1 | tee "$APP/logs/$step"
+    local status=${PIPESTATUS[0]}
     echo "::endgroup::"
     echo "$* -> exit $status" >> "$APP/results"
 }
