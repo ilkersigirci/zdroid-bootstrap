@@ -28,7 +28,9 @@ step=0
 run() {
     step=$((step + 1))
     echo "::group::$*"
-    "$@" < /dev/null 2>&1 | tee "$APP/logs/$step"
+    # A step that waits on something Android has and the container lacks
+    # would otherwise hang the job until GitHub's six-hour limit.
+    timeout --kill-after=30 1200 "$@" < /dev/null 2>&1 | tee "$APP/logs/$step"
     local status=${PIPESTATUS[0]}
     echo "::endgroup::"
     echo "$* -> exit $status" >> "$APP/results"
@@ -42,10 +44,12 @@ case "$1" in
         run pkg upgrade
         ;;
     readme)
-        # The README's order: upgrade first, fix-broken when apt asks.
+        # The README's order: upgrade first, fix-broken when apt asks, then
+        # the upgrade again.
         run pkg update
         run pkg upgrade
         run apt --fix-broken install
+        run pkg upgrade
         ;;
 esac
 run apt update
