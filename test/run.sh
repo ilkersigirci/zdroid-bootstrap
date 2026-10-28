@@ -14,7 +14,8 @@ WORK="$(mktemp -d)"
 APP="$WORK/com.zdroid"
 PREFIX="$APP/files/usr"
 
-mkdir -p "$PREFIX" "$APP/files/home"
+# Android creates every app's cache directory, where apt keeps downloads.
+mkdir -p "$PREFIX" "$APP/files/home" "$APP/cache"
 unzip -q "$ZIP" -d "$PREFIX"
 # Zdroid's extractor keeps only the owner's permission bits.
 find "$APP" -type d -exec chmod 700 {} +
