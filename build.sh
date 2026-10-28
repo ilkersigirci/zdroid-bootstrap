@@ -62,6 +62,10 @@ cp -a "$PATCHES"/. "$ROOTFS"/
 REMOVED=(
     # Made dpkg delete lib/libc++_shared.so when it upgraded libc++.
     etc/dpkg/dpkg.cfg.d/zed-protect-libs
+    # Patched installed files after each dpkg run, too late and in too few
+    # places; zed-pre-install-rewrite.sh now patches packages beforehand.
+    etc/apt/apt.conf.d/98-zed-patchelf
+    etc/apt/zed-patchelf-hook.sh
 )
 for path in "${REMOVED[@]}"; do
     rm -f "$ROOTFS/$path"

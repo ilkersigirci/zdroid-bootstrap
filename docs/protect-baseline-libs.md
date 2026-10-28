@@ -14,7 +14,9 @@ After running an `apt --fix-broken install` that pulls in C++/Rust toolchain pac
 
 segfaults at `0x1423c0` on the first PLT trampoline. Recovery without the protections below required uninstalling the app to wipe `$PREFIX` and re-extract from the APK.
 
-## Primary fix: patchelf skip-list in the apt Post-Invoke hook
+## Primary fix: patchelf skip-list in the apt Post-Invoke hook (hook removed in v2026.05.06-r6)
+
+Since v2026.05.06-r6 the bootstrap rewrites packages before dpkg unpacks them, with equal-length byte replacements only, and nothing runs patchelf on installed files. The history below explains why patchelf must never touch these two files.
 
 `apply_runtime_patches` writes `$PREFIX/etc/apt/zed-patchelf-hook.sh` with the following early-return in `maybe_patchelf`:
 

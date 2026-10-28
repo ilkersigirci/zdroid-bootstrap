@@ -43,28 +43,40 @@ docker run --rm --privileged -v "$APP:/data/data/com.zdroid" termux/termux-docke
     /data/data/com.zdroid/files/usr/bin/bash /data/data/com.zdroid/scenario.sh "$SCENARIO"
 
 annotate() {
-    # GitHub shows these on the run's page; %0A keeps the line breaks.
-    echo "::warning title=$SCENARIO: $1::$(tail -n 40 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"
+    # GitHub shows these on the run's page, at most ten per step; %0A keeps
+    # the line breaks.
+    echo "::warning title=$SCENARIO: $1::$(tail -n 60 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"
 }
-annotate "steps" < "$APP/results"
-for log in "$APP"/logs/*; do
-    annotate "output of step $(basename "$log")" < "$log"
-done
 {
-    ls -la "$PREFIX/lib/apt/methods/"
-    readelf -d "$PREFIX/lib/apt/methods/http" | grep -E "RUNPATH|NEEDED"
-    cmp "$WORK/methods.pristine/http" "$PREFIX/lib/apt/methods/http" && echo "http unchanged"
-} 2>&1 | annotate "https method"
-ls -la "$PREFIX/lib/libandroid-glob.so" "$PREFIX/lib/libc++_shared.so" 2>&1 | annotate "libraries"
+    step=0
+    while IFS= read -r result; do
+        step=$((step + 1))
+        echo "$result"
+        case "$result" in
+            *"-> exit 0") ;;
+            *) tail -n 8 "$APP/logs/$step" | sed 's/^/    /' ;;
+        esac
+    done < "$APP/results"
+    echo
+    echo "Segmentation faults: $(cat "$APP"/logs/* | grep -c "Segmentation fault")"
+    echo "CANNOT LINK: $(cat "$APP"/logs/* | grep -c "CANNOT LINK")"
+} | annotate "steps"
+{
+    cat "$APP/diagnostics"
+    echo "== libraries"
+    ls -la "$PREFIX/lib/libandroid-glob.so" "$PREFIX/lib/libc++_shared.so"
+    echo "== https method"
+    readelf -d "$PREFIX/lib/apt/methods/http" | grep -E "RUNPATH"
+    cmp -s "$WORK/methods.pristine/http" "$PREFIX/lib/apt/methods/http" && echo "http unchanged" || echo "http replaced"
+} 2>&1 | annotate "state"
 # dpkg keeps each file's mtime from the package, so compare inode change times.
 find "$PREFIX" -path "$PREFIX/lib/node_modules" -prune -o -type f -cnewer "$WORK/installed" -print \
     | while IFS= read -r file; do
         if [ "$(head -c 4 "$file" | tail -c 3)" = ELF ] \
-            && readelf -d "$file" 2>/dev/null | grep -q "path: \[.*com\.termux"; then
+            && grep -q -a "/data/data/com.termux/" "$file"; then
             echo "${file#"$PREFIX"/}"
         fi
-    done | sort | annotate "installed ELF files whose RUNPATH still names com.termux"
-grep -E "^(Commandline|Install|Upgrade|Remove|Reinstall|Error)" "$PREFIX/var/log/apt/history.log" 2>&1 \
-    | cut -c1-400 | annotate "apt history"
+    done | sort | { cat; echo "(end)"; } | annotate "installed ELF files still naming com.termux"
+grep -E "^(Commandline|Error)" "$PREFIX/var/log/apt/history.log" 2>&1 | annotate "apt history"
 
 grep -q "^apt update -> exit 0$" "$APP/results" && grep -q "^jq --version -> exit 0$" "$APP/results"

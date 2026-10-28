@@ -53,8 +53,7 @@ What `build.sh` does:
 | `etc/profile.d/zed-init.sh` | install_profile_d_init | `bash -l` self-bootstrap (PREFIX/PATH/HOME) for sideband shells (run-as, adb, ssh subprocess) |
 | `etc/apt/preferences.d/zed-pin-dpkg` | install_apt_dpkg_pin | Holds `dpkg` at the bootstrap's version, whose path rewrite Termux's build lacks |
 | `etc/apt/apt.conf.d/99-zed-rewrite-postinst` | install_apt_rewrite_hook | DPkg::Post-Invoke sed over every metadata file type rewriting com.termux→com.zdroid |
-| `etc/apt/apt.conf.d/98-zed-patchelf` + `etc/apt/zed-patchelf-hook.sh` | install_apt_patchelf_hook | Hex-patches com.termux paths (DT_RUNPATH included) and the standalone `/etc/resolv.conf` in every ELF a dpkg run installs, wherever it is |
-| `etc/apt/apt.conf.d/97-zed-pre-install` + `etc/apt/zed-pre-install-rewrite.sh` | install_apt_pre_install_hook | Reads .deb stdin, unpacks, rewrites com.termux→com.zdroid in text files, repacks |
+| `etc/apt/apt.conf.d/97-zed-pre-install` + `etc/apt/zed-pre-install-rewrite.sh` | install_apt_pre_install_hook | Before dpkg unpacks each .deb, rewrites com.termux→com.zdroid in every file, ELF files and their DT_RUNPATH included, plus the standalone `/etc/resolv.conf`, and repacks it |
 | `etc/apt/apt.conf.d/97-zed-node-platform` + `etc/apt/zed-node-platform-hook.sh` | install_apt_node_platform_hook | perl rewrites `\x00android\x00` → `\x00linux\x00\x00` in `$PREFIX/bin/node` so `process.platform === 'linux'` |
 | `.zed/bin/npm` | install_npm_wrapper | PATH-precedence wrapper setting LD_PRELOAD=libtermux-exec.so + npm_config_libc=musl, post-invokes launcher generator |
 | `etc/apt/zed-launcher-gen.sh` | install_npm_launcher_generator | Walks `$PREFIX/bin/*` and `$PREFIX/lib/node_modules/**`, classifies ld-musl vs ld-linux, generates musl-static + grun wrappers |

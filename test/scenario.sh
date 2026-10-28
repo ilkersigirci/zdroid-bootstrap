@@ -56,3 +56,14 @@ esac
 run apt update
 run apt install jq
 run jq --version
+
+{
+    echo "== sh with LD_PRELOAD"
+    sh -c 'echo ok' < /dev/null 2>&1 | tail -n 3
+    echo "== sh without LD_PRELOAD"
+    LD_PRELOAD= sh -c 'echo ok' < /dev/null 2>&1 | tail -n 3
+    echo "== apt config"
+    apt-config dump 2>&1 | grep -E "^(APT::Get::Assume-Yes|Dir::Etc |Dir::Etc::parts|Dir::State::status) "
+    echo "== termux-exec"
+    ls -la "$PREFIX"/lib/libtermux-exec* 2>&1
+} > "$APP/diagnostics" 2>&1
