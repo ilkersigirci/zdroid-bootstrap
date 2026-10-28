@@ -39,6 +39,12 @@ fi
 # the runtime side. Same flag set in node_runtime crate for
 # Zed-driven npm installs.
 export npm_config_libc=musl
+# Likewise pick the linux variants: their package.json says `os: linux`,
+# and npm compares that with process.platform, which Termux's Node reports
+# as android. etc/apt/zed-node-platform-hook.sh patches that string in
+# $PREFIX/bin/node, but on a tablet Node still reported android after it,
+# and npm left out Codex's and Claude Code's binaries.
+export npm_config_os=linux
 "$NODE" "$REAL_NPM_JS" "$@"
 RC=$?
 if [ -x "$HOOK" ]; then
