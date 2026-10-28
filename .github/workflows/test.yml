@@ -10,9 +10,17 @@ on:
 
 permissions: {}
 
+# A newer push to the same branch makes an older run moot.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-24.04-arm
+    # The scenario caps each step at 20 minutes; this caps the whole job,
+    # instead of GitHub's six hours.
+    timeout-minutes: 120
     permissions:
       contents: read
     strategy:

@@ -30,16 +30,21 @@ while IFS= read -r deb; do
                 my $changed = 0;
                 while (my $path = <STDIN>) {
                     chomp $path;
-                    open my $fh, "+<:raw", $path or next;
-                    my $data = do { local $/; <$fh> };
-                    my $count = ($data =~ s{/data/data/com\.termux/}{/data/data/com.zdroid/}g)
-                        + ($data =~ s{\x00/etc/resolv\.conf\x00}{\x00/sdcard/.zed/r\x00\x00\x00}g);
-                    if ($count) {
-                        seek $fh, 0, 0;
-                        print $fh $data;
-                        $changed = 1;
+                    # Packages ship some files read-only, the tor binaries for one.
+                    my $mode = (stat $path)[2] & 07777;
+                    chmod($mode | 0200, $path);
+                    if (open my $fh, "+<:raw", $path) {
+                        my $data = do { local $/; <$fh> };
+                        my $count = ($data =~ s{/data/data/com\.termux/}{/data/data/com.zdroid/}g)
+                            + ($data =~ s{\x00/etc/resolv\.conf\x00}{\x00/sdcard/.zed/r\x00\x00\x00}g);
+                        if ($count) {
+                            seek $fh, 0, 0;
+                            print $fh $data;
+                            $changed = 1;
+                        }
+                        close $fh;
                     }
-                    close $fh;
+                    chmod($mode, $path);
                 }
                 exit($changed ? 0 : 1);
             '

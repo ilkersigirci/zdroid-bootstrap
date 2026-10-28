@@ -76,7 +76,10 @@ find "$PREFIX" -path "$PREFIX/lib/node_modules" -prune -o -type f -cnewer "$WORK
             && grep -q -a "/data/data/com.termux/" "$file"; then
             echo "${file#"$PREFIX"/}"
         fi
-    done | sort | { cat; echo "(end)"; } | annotate "installed ELF files still naming com.termux"
+    done | sort > "$WORK/leftovers"
+{ cat "$WORK/leftovers"; echo "(end)"; } | annotate "installed ELF files still naming com.termux"
 grep -E "^(Commandline|Error)" "$PREFIX/var/log/apt/history.log" 2>&1 | annotate "apt history"
 
-grep -q "^apt update -> exit 0$" "$APP/results" && grep -q "^jq --version -> exit 0$" "$APP/results"
+grep -q "^apt update -> exit 0$" "$APP/results" \
+    && grep -q "^jq --version -> exit 0$" "$APP/results" \
+    && [ ! -s "$WORK/leftovers" ]
