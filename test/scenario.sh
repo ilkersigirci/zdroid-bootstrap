@@ -51,11 +51,22 @@ case "$1" in
         run apt --fix-broken install
         run pkg upgrade
         ;;
+    agents)
+        # What the agent panel's CLIs need, as Zdroid's README says, on the
+        # Node the bootstrap ships.
+        run apt --fix-broken install
+        run pkg install npm
+        run npm install -g @openai/codex
+        run codex --version
+        ;;
 esac
 # apt can still fetch, and what it installs runs.
 run apt update
 run apt install jq
 run jq --version
+# npm picks packages' native builds by process.platform; the node platform
+# hook makes Termux's Node report linux.
+run node -e 'process.exit(process.platform === "linux" ? 0 : 1)'
 
 {
     echo "== sh with LD_PRELOAD"
@@ -64,6 +75,8 @@ run jq --version
     LD_PRELOAD= sh -c 'echo ok' < /dev/null 2>&1 | tail -n 3
     echo "== apt config"
     apt-config dump 2>&1 | grep -E "^(APT::Get::Assume-Yes|Dir::Etc |Dir::Etc::parts|Dir::State::status) "
+    echo "== node"
+    node -p 'process.version + " " + process.platform' 2>&1
     echo "== termux-exec"
     ls -la "$PREFIX"/lib/libtermux-exec* 2>&1
 } > "$APP/diagnostics" 2>&1

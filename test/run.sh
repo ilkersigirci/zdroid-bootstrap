@@ -82,4 +82,6 @@ grep -E "^(Commandline|Error)" "$PREFIX/var/log/apt/history.log" 2>&1 | annotate
 
 grep -q "^apt update -> exit 0$" "$APP/results" \
     && grep -q "^jq --version -> exit 0$" "$APP/results" \
+    && grep -q "^node -e .* -> exit 0$" "$APP/results" \
+    && ! grep -q "^codex --version -> exit [1-9]" "$APP/results" \
     && [ ! -s "$WORK/leftovers" ]
