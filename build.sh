@@ -57,6 +57,16 @@ unzip -q "$IN_ZIP" -d "$ROOTFS"
 echo "build: copying patches"
 cp -a "$PATCHES"/. "$ROOTFS"/
 
+# Files earlier releases shipped that patches/ no longer has. The base is an
+# earlier release, so leaving them out of patches/ isn't enough.
+REMOVED=(
+    # Made dpkg delete lib/libc++_shared.so when it upgraded libc++.
+    etc/dpkg/dpkg.cfg.d/zed-protect-libs
+)
+for path in "${REMOVED[@]}"; do
+    rm -f "$ROOTFS/$path"
+done
+
 # rewrite_maintainer_scripts equivalent. The bootstrap built by termux-
 # packages CI with TERMUX_APP_PACKAGE=com.zdroid already has com.zdroid
 # paths in binaries' RUNPATH + most files. But dpkg maintainer scripts

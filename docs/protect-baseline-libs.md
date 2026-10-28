@@ -30,19 +30,13 @@ The hook fires after every `apt install` because the bootstrap ships these files
 
 **Subtle prerequisite:** the case statement uses shell parameter expansion `${1##*/}` rather than `$(basename -- "$1")`, because the helper body is generated from a Rust `format!(...)` string and over-escaping the inner quotes (`\\\"$1\\\"` → rendered as `\"$1\"`) makes shell pass a literal-with-quotes argument to basename, returning a junk value that never matches the case patterns. The skip-list never fires in that form. **Always render and grep the actual on-disk script when changing this file.** See commit `d1a6319256` for the original break and fix.
 
-## Defense in depth: dpkg path-exclude
+## Removed in v2026.05.06-r6: dpkg path-exclude
 
-`apply_runtime_patches` also writes `$PREFIX/etc/dpkg/dpkg.cfg.d/zed-protect-libs`:
-
-```
-path-exclude=/data/data/com.zdroid/files/usr/lib/libc++_shared.so
-```
-
-This makes dpkg refuse to extract that exact path from any package. The Termux apt repository's `libc++` package ships its own `libc++_shared.so`; if a future apt run upgrades libc++ as a transitive dep, the path-exclude prevents the on-disk file from being replaced. **In practice this never fires on the current Termux package set** — `apt --fix-broken install` after `apt install rust` does not pull libc++ as a new install — but it's a cheap insurance policy against the failure mode coming back via a future package metadata change.
+`etc/dpkg/dpkg.cfg.d/zed-protect-libs` told dpkg never to extract `lib/libc++_shared.so`. It did fire, the opposite of protecting the file: Termux's repository moved `libc++` from 29 to 30, `pkg upgrade` upgraded it, dpkg skipped the excluded file, then deleted the old one as no longer part of the package. Every C++ program, apt included, then failed with `library "libc++_shared.so" not found`. Without the exclude, the upgrade installs Termux's `libc++_shared.so`, which keeps the C++ ABI the bootstrap's binaries use; the patchelf skip-list above still keeps the hook from rewriting it.
 
 ## Verifying
 
-After any `apt install` operation, both files should remain at their in-zip / extract-time values:
+After any `apt install` that doesn't upgrade `libc++`, both files should remain at their in-zip / extract-time values:
 
 ```sh
 sha256sum $PREFIX/lib/libc++_shared.so $PREFIX/lib/ld-musl-aarch64.so.1

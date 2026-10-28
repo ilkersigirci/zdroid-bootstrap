@@ -52,4 +52,7 @@ case "$1" in
         run pkg upgrade
         ;;
 esac
+# apt can still fetch, and what it installs runs.
 run apt update
+run apt install jq
+run jq --version

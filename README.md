@@ -9,7 +9,7 @@ The bootstrap is the rebuilt Termux userland with Zdroid-specific patches baked 
 - Patched dpkg / apt for cross-package-name `pkg install`
 - Permission fixes for app-private storage exec
 - libtermux-exec built with our paths
-- apt Pre/Post-Invoke hooks + dpkg path-protect + dpkg/patchelf pins + node platform hook (Phase 8b — see `patches/`)
+- apt Pre/Post-Invoke hooks + dpkg pin + node platform hook (Phase 8b — see `patches/`)
 - musl loader with `/etc/resolv.conf` → `/sdcard/.zed/r` baked in
 - npm wrapper + launcher-generator under `.zed/bin/`
 - bash-`-l` self-bootstrap shim under `etc/profile.d/`
@@ -30,7 +30,7 @@ git push origin v2026.05.06-r6
 ```
 
 Two source inputs:
-1. A base `bootstrap-aarch64.zip`. Dylan built the first one from [termux-packages](https://github.com/termux/termux-packages) with `TERMUX_APP_PACKAGE=com.zdroid` and a patched dpkg, but neither that build nor the zip is published. The workflow starts from his last release, `v2026.05.06-r4`, pinned by SHA-256: `build.sh` only overlays files and rewrites paths, so running it again on its own output is harmless. One limit follows: deleting a file from `patches/` doesn't remove it from the zip.
+1. A base `bootstrap-aarch64.zip`. Dylan built the first one from [termux-packages](https://github.com/termux/termux-packages) with `TERMUX_APP_PACKAGE=com.zdroid` and a patched dpkg, but neither that build nor the zip is published. The workflow starts from his last release, `v2026.05.06-r4`, pinned by SHA-256: `build.sh` only overlays files and rewrites paths, so running it again on its own output is harmless. To drop a file earlier releases shipped, add it to `REMOVED` in `build.sh`.
 2. The `patches/` directory in this repo — every static file the editor's `apply_runtime_patches` used to drop at first boot. Pure shell / config / one binary blob (musl loader).
 
 To build locally:
@@ -51,10 +51,9 @@ What `build.sh` does:
 | Path | Source | Purpose |
 |---|---|---|
 | `etc/profile.d/zed-init.sh` | install_profile_d_init | `bash -l` self-bootstrap (PREFIX/PATH/HOME) for sideband shells (run-as, adb, ssh subprocess) |
-| `etc/apt/preferences.d/zed-pin-dpkg` | install_apt_dpkg_pin | Pin-Priority 1001 holds for `dpkg` and `patchelf` packages — refuses upstream upgrade that would brick path-rewrite |
-| `etc/dpkg/dpkg.cfg.d/zed-protect-libs` | install_dpkg_path_protect | dpkg path-exclude for `libc++_shared.so` — protects our build-time variant from upstream replacement |
+| `etc/apt/preferences.d/zed-pin-dpkg` | install_apt_dpkg_pin | Holds `dpkg` at the bootstrap's version, whose path rewrite Termux's build lacks |
 | `etc/apt/apt.conf.d/99-zed-rewrite-postinst` | install_apt_rewrite_hook | DPkg::Post-Invoke sed over every metadata file type rewriting com.termux→com.zdroid |
-| `etc/apt/apt.conf.d/98-zed-patchelf` + `etc/apt/zed-patchelf-hook.sh` | install_apt_patchelf_hook | patchelf-set-rpath + perl-hex-patch on freshly-installed ELFs (handles upstream binaries with com.termux DT_RUNPATH + rodata) |
+| `etc/apt/apt.conf.d/98-zed-patchelf` + `etc/apt/zed-patchelf-hook.sh` | install_apt_patchelf_hook | Hex-patches com.termux paths (DT_RUNPATH included) and the standalone `/etc/resolv.conf` in every ELF a dpkg run installs, wherever it is |
 | `etc/apt/apt.conf.d/97-zed-pre-install` + `etc/apt/zed-pre-install-rewrite.sh` | install_apt_pre_install_hook | Reads .deb stdin, unpacks, rewrites com.termux→com.zdroid in text files, repacks |
 | `etc/apt/apt.conf.d/97-zed-node-platform` + `etc/apt/zed-node-platform-hook.sh` | install_apt_node_platform_hook | perl rewrites `\x00android\x00` → `\x00linux\x00\x00` in `$PREFIX/bin/node` so `process.platform === 'linux'` |
 | `.zed/bin/npm` | install_npm_wrapper | PATH-precedence wrapper setting LD_PRELOAD=libtermux-exec.so + npm_config_libc=musl, post-invokes launcher generator |

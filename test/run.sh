@@ -55,17 +55,16 @@ done
     readelf -d "$PREFIX/lib/apt/methods/http" | grep -E "RUNPATH|NEEDED"
     cmp "$WORK/methods.pristine/http" "$PREFIX/lib/apt/methods/http" && echo "http unchanged"
 } 2>&1 | annotate "https method"
-{
-    ls -la "$PREFIX"/lib/libandroid-glob*
-    sha256sum "$PREFIX/lib/libandroid-glob.so"
-} 2>&1 | annotate "libandroid-glob"
+ls -la "$PREFIX/lib/libandroid-glob.so" "$PREFIX/lib/libc++_shared.so" 2>&1 | annotate "libraries"
 # dpkg keeps each file's mtime from the package, so compare inode change times.
-find "$PREFIX" -type f -cnewer "$WORK/installed" | while IFS= read -r file; do
-    if [ "$(head -c 4 "$file" | tail -c 3)" = ELF ]; then
-        echo "${file#"$PREFIX"/}"
-    fi
-done | sort | annotate "ELF files changed after install"
+find "$PREFIX" -path "$PREFIX/lib/node_modules" -prune -o -type f -cnewer "$WORK/installed" -print \
+    | while IFS= read -r file; do
+        if [ "$(head -c 4 "$file" | tail -c 3)" = ELF ] \
+            && readelf -d "$file" 2>/dev/null | grep -q "path: \[.*com\.termux"; then
+            echo "${file#"$PREFIX"/}"
+        fi
+    done | sort | annotate "installed ELF files whose RUNPATH still names com.termux"
 grep -E "^(Commandline|Install|Upgrade|Remove|Reinstall|Error)" "$PREFIX/var/log/apt/history.log" 2>&1 \
     | cut -c1-400 | annotate "apt history"
 
-grep -q "^apt update -> exit 0$" "$APP/results"
+grep -q "^apt update -> exit 0$" "$APP/results" && grep -q "^jq --version -> exit 0$" "$APP/results"
