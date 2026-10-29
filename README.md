@@ -1,3 +1,6 @@
+> [!IMPORTANT]  
+> Since https://github.com/ilkersigirci/zed-android-port 0.10.0 release, zdroid uses its own runtime. Hence, bootstrap runtime removed and it is not needed anymore.
+
 # zdroid-bootstrap
 
 The Termux userland that [Zdroid](https://github.com/ilkersigirci/zed-android-port), the Android port of Zed, installs into `/data/data/com.zdroid/files/usr` (`$PREFIX`) for its **Bootstrap** runtime: the shell, the terminal's tools, language servers and package manager, running without root.
